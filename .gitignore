@@ -1,0 +1,7 @@
+.bash_history
+.coverage
+.DS_Store
+.idea/
+.pytest_cache/
+.vscode
+venv/
