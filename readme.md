@@ -10,7 +10,7 @@ Python 3.8.9
 ## Installation and How to Start the App
 To get started, you will need to set up a virtualenv:
 ```
-cd cribl_test_project
+cd cb_test_project
 python3 -m venv venv
 ```
 After that, please activate the virtualenv (venv):
@@ -40,7 +40,7 @@ PLEASE KEEP IN MIND THAT THE ENDPOINT `/read-logs/` (and other routes) ALWAYS EN
 - `filter=keyword` - optional - if specified, it will return only results with the keyword, the keyword is case-insensitive
 - `timeout=60` - optional - default to 60 seconds. It will return a partial result list if the query exceeds the timeout limit
 
-For example: a URL: `http://127.0.0.1:5000/read-logs/?filename=linux.log&num=250&filter=failure&filepath=/users/wlau/cribl_test_project/&timeout=5` will return the most recent 250 results that contains the keyword "failure" from `/users/wlau/cribl_test_project/linux.log`, with a timeout after 5 seconds
+For example: a URL: `http://127.0.0.1:5000/read-logs/?filename=linux.log&num=250&filter=failure&filepath=/users/wlau/cb_test_project/&timeout=5` will return the most recent 250 results that contains the keyword "failure" from `/users/wlau/cb_test_project/linux.log`, with a timeout after 5 seconds
 
 ### Command Prompt (Bonus)
 Alternatively, the system has a command prompt option that allows direct access to the log files without having to use go to the directory and run editor such as VIM to view the log files. To use that, simply run from the main directory:
