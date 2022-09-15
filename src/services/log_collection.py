@@ -7,29 +7,10 @@ from src.constants import TIMEOUT
 class LogCollectionService(object):
     @classmethod
     def log_reader(cls, filename, num_of_lines, filter_keyword=None, timeout=TIMEOUT):
-        log_list = list()
-        results = dict()
-        timer = float(0)
         seek_position = cls._seek_position(filename)
+        for line, timer, timed_out, seek_position in cls._read_log_generator(filename, num_of_lines, filter_keyword, timeout, seek_position):
+            yield line + '\n'
 
-        counter = 0
-        start_time = time.time()
-        timeout_timestamp = timeout + start_time
-        break_flag = False
-        while seek_position >= 0 and not break_flag:
-            cur_time = time.time()
-            if cur_time > timeout_timestamp:
-                break
-
-            for line, timer, timed_out, seek_position in cls._read_log_generator(filename, num_of_lines, filter_keyword, timeout, seek_position):
-                if timed_out:
-                    results['message'] = "Timeout, partial results listed"
-                else:
-                    if counter >= num_of_lines:
-                        break_flag = True
-                        break
-                    counter += 1
-                    yield line + '\n'
 
     @staticmethod
     def _seek_position(filename):
@@ -45,10 +26,9 @@ class LogCollectionService(object):
             log_file.seek(0, os.SEEK_END)
             line = ''
             start_time = time.time()
-            end_position = position - 10000
             timeout_timestamp = timeout + start_time
             has_timed_out = False
-            while position >= end_position and position >= 0:
+            while position >= 0:
                 cur_time = time.time()
                 timer = cur_time - start_time
 
