@@ -10,35 +10,51 @@ class LogCollectionService(object):
         log_list = list()
         results = dict()
         timer = float(0)
-        for line, timer, timed_out in cls._read_log_generator(filename, num_of_lines, filter_keyword, timeout):
-            if timed_out:
-                results['message'] = "Timeout, partial results listed"
-            else:
-                log_list.append(line)
+        seek_position = cls._seek_position(filename)
 
-        results['logs'] = log_list
-        results['count'] = len(log_list)
-        results['filesize'] = os.path.getsize(filename)
-        results['query_time'] = timer
-        return results
+        counter = 0
+        start_time = time.time()
+        timeout_timestamp = timeout + start_time
+        break_flag = False
+        while seek_position >= 0 and not break_flag:
+            cur_time = time.time()
+            if cur_time > timeout_timestamp:
+                break
+
+            for line, timer, timed_out, seek_position in cls._read_log_generator(filename, num_of_lines, filter_keyword, timeout, seek_position):
+                if timed_out:
+                    results['message'] = "Timeout, partial results listed"
+                else:
+                    if counter >= num_of_lines:
+                        break_flag = True
+                        break
+                    counter += 1
+                    yield line + '\n'
+
+    @staticmethod
+    def _seek_position(filename):
+        with open(filename, errors='ignore') as log_file:
+            log_file.seek(0, os.SEEK_END)
+            return log_file.tell()
+
 
     @classmethod
-    def _read_log_generator(cls, filename, num_of_lines, filter_keyword, timeout):
+    def _read_log_generator(cls, filename, num_of_lines, filter_keyword, timeout, position):
         with open(filename, errors='ignore') as log_file:
             current_line = 0
             log_file.seek(0, os.SEEK_END)
             line = ''
-            position = log_file.tell()
             start_time = time.time()
+            end_position = position - 10000
             timeout_timestamp = timeout + start_time
             has_timed_out = False
-            while position >= 0:
+            while position >= end_position and position >= 0:
                 cur_time = time.time()
                 timer = cur_time - start_time
 
                 if cur_time > timeout_timestamp:
                     has_timed_out = True
-                    yield None, timer, has_timed_out
+                    yield None, timer, has_timed_out, position
                     break
 
                 log_file.seek(position)
@@ -47,7 +63,7 @@ class LogCollectionService(object):
                     new_line = line[::-1]
                     found_line = cls._lookup(new_line, filter_keyword)
                     if found_line:
-                        yield new_line, timer, has_timed_out
+                        yield new_line, timer, has_timed_out, position
                         current_line += 1
                         if current_line == num_of_lines:
                             break
@@ -62,7 +78,7 @@ class LogCollectionService(object):
                     new_line = line[::-1]
                     found_line = cls._lookup(new_line, filter_keyword)
                     if found_line:
-                        yield new_line, timer, has_timed_out
+                        yield new_line, timer, has_timed_out, position
 
     @staticmethod
     def _lookup(line, keyword):

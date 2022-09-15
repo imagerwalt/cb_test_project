@@ -1,6 +1,6 @@
 import requests
 
-from flask import Flask, request
+from flask import Flask, request, Response
 
 from src.exceptions import FileHandlingException
 from src.constants import TIMEOUT, FILEPATH
@@ -27,15 +27,20 @@ def read_logs():
         err = e.args[0]
         return BaseResponse(http_status=err['http_status'], status_code=err['status_code'], error=err['message'])
 
-
-    num_of_messages = int(request.args.get('num', default=20))
     filter_keyword = request.args.get('filter')
-    timeout = int(request.args.get('timeout', default=TIMEOUT))
+    try:
+        num_of_messages = int(request.args.get('num', default=20))
+        timeout = int(request.args.get('timeout', default=TIMEOUT))
+    except (TypeError, ValueError):
+        return Response('error', status=400, mimetype='application/json')
 
     full_path = filepath + filename
-    log_results = LogCollectionService.log_reader(full_path, num_of_messages, filter_keyword, timeout)
 
-    return BaseResponse(results=log_results)
+    def generate():
+        for result in LogCollectionService.log_reader(full_path, num_of_messages, filter_keyword, timeout):
+            yield result
+
+    return Response(generate(), mimetype='application/json')
 
 
 @app.route("/external/", methods=["POST"])
