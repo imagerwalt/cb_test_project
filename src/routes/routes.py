@@ -4,7 +4,7 @@ from flask import Flask, request, Response
 
 from src.exceptions import FileHandlingException
 from src.constants import TIMEOUT, FILEPATH
-from src.routes import BaseResponse
+from src.routes import BaseResponse, ResponseStatus
 
 from src.services.log_collection import LogCollectionService
 from src.services.file_handling import FileHandlingService
@@ -31,16 +31,12 @@ def read_logs():
     try:
         num_of_messages = int(request.args.get('num', default=20))
         timeout = int(request.args.get('timeout', default=TIMEOUT))
-    except (TypeError, ValueError):
-        return Response('error', status=400, mimetype='application/json')
+    except ValueError as e:
+        return BaseResponse(http_status=400, status_code=ResponseStatus.INVALID_REQUEST, error='Invalid Request')
 
     full_path = filepath + filename
 
-    def generate():
-        for result in LogCollectionService.log_reader(full_path, num_of_messages, filter_keyword, timeout):
-            yield result
-
-    return Response(generate(), mimetype='application/json')
+    return Response(generate(full_path, num_of_messages, filter_keyword, timeout), mimetype='application/json')
 
 
 @app.route("/external/", methods=["POST"])
@@ -54,8 +50,8 @@ def external_server():
         'num': data.get('num'),
         'filter': data.get('filter')
     }
-    results = requests.post(url=f"{data['url']}/listen", json=payload)
-    return BaseResponse(results=results.json()['results'])
+    results = requests.post(url=f"{data['url']}/listen/", json=payload)
+    return Response(results, mimetype='application/json')
 
 
 @app.route("/listen/", methods=["POST"])
@@ -68,6 +64,10 @@ def listen():
     filename = data['filename']
     num_of_messages = data.get('num', 50)
     filter_keyword = data.get('filter')
-    log_results = LogCollectionService.log_reader(filename, num_of_messages, filter_keyword)
 
-    return BaseResponse(results=log_results)
+    return Response(generate(filename, num_of_messages, filter_keyword))
+
+
+def generate(full_path, num_of_messages, filter_keyword, timeout=TIMEOUT):
+    for result in LogCollectionService.log_reader(full_path, num_of_messages, filter_keyword, timeout):
+        yield result

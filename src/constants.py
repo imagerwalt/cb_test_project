@@ -1,2 +1,3 @@
-TIMEOUT = 6
+TIMEOUT = 60
 FILEPATH = "/var/log/"
+CHAR_READ = 10

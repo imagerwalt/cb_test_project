@@ -1,64 +1,65 @@
 import os
 import re
 import time
-from src.constants import TIMEOUT
+import json
+from src.constants import TIMEOUT, CHAR_READ
 
 
 class LogCollectionService(object):
     @classmethod
     def log_reader(cls, filename, num_of_lines, filter_keyword=None, timeout=TIMEOUT):
-        seek_position = cls._seek_position(filename)
-        for line, timer, timed_out, seek_position in cls._read_log_generator(filename, num_of_lines, filter_keyword, timeout, seek_position):
-            yield line + '\n'
-
+        for line, timer in cls._read_log_generator(filename, num_of_lines, filter_keyword, timeout):
+            yield cls.form_output(line, timer) + '\n'
 
     @staticmethod
-    def _seek_position(filename):
-        with open(filename, errors='ignore') as log_file:
-            log_file.seek(0, os.SEEK_END)
-            return log_file.tell()
-
+    def form_output(line, timer):
+        return json.dumps({'log': line, 'timer': timer})
 
     @classmethod
-    def _read_log_generator(cls, filename, num_of_lines, filter_keyword, timeout, position):
+    def _read_log_generator(cls, filename, num_of_lines, filter_keyword, timeout):
         with open(filename, errors='ignore') as log_file:
             current_line = 0
             log_file.seek(0, os.SEEK_END)
+            position = log_file.tell()
             line = ''
             start_time = time.time()
             timeout_timestamp = timeout + start_time
-            has_timed_out = False
+
             while position >= 0:
                 cur_time = time.time()
                 timer = cur_time - start_time
-
                 if cur_time > timeout_timestamp:
-                    has_timed_out = True
-                    yield None, timer, has_timed_out, position
                     break
 
                 log_file.seek(position)
-                next_char = log_file.read(1)
-                if next_char == "\n":
-                    new_line = line[::-1]
-                    found_line = cls._lookup(new_line, filter_keyword)
+                next_chars = log_file.read(CHAR_READ)
+                newline_loc = next_chars.find("\n")
+                if newline_loc >= 0:
+                    line = next_chars[newline_loc + 1::] + line
+                    found_line = cls._lookup(line, filter_keyword)
                     if found_line:
-                        yield new_line, timer, has_timed_out, position
+                        yield line, timer
                         current_line += 1
                         if current_line == num_of_lines:
                             break
-                    line = ''
+                    line = next_chars[0:newline_loc]
                 else:
-                    line += next_char
-                position -= 1
+                    line = next_chars + line
 
-                # if it goes to the top of the file (first character), output it,
+                position -= CHAR_READ
+
+                # if it goes to the top of the file (first batch of character), output it,
                 # since it will be outside of the while loop
-                if position == -1:
-                    new_line = line[::-1]
-                    found_line = cls._lookup(new_line, filter_keyword)
+                if position < 0:
+                    # read the remaining characters left unread
+                    log_file.seek(0)
+                    next_chars = log_file.read(CHAR_READ)
+                    remaining_chars = CHAR_READ + position
+
+                    line = next_chars[0:remaining_chars] + line
+                    found_line = cls._lookup(line, filter_keyword)
                     if found_line:
-                        yield new_line, timer, has_timed_out, position
+                        yield line, timer
 
     @staticmethod
     def _lookup(line, keyword):
